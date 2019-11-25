@@ -58,6 +58,8 @@ fitModel <- function(type,
   S <- max(SubPar$theta)
   isIdentifiable(S, mergedTree)
 
+
+
   # transformed parameters
   transformedPar <- getTransformed(thetaNames = thetaNames,
                                    transformedParameters = transformedParameters)
@@ -70,7 +72,7 @@ fitModel <- function(type,
   covData <- covDataRead(covData, N)
   predType <- predTypeDefault(covData, predType=predType)
 
-  if(type == "traitMPT"){
+  if(type %in% c("traitMPT", "mixtureMPT")){
 
     # random-effect structure: inverse Wishart prior
     if (is.null(hyperprior$V))
@@ -100,6 +102,28 @@ fitModel <- function(type,
     predString <- predTmp2$modelString
     covPars <- predTmp2$covPars
     X_list <- predTmp2$X_list
+    if(type == "mixtureMPT") {
+
+      # check which parameter should be ordered to prevent label switching ----
+      orderedParameter <- hyperprior$orderedParameter
+      if(is.character(orderedParameter)) {
+        hyperprior$s_ordered <- which(thetaUnique == orderedParameter)
+      } else {
+        hyperprior$s_ordered <- orderedParameter
+      }
+      hyperprior$orderedParameter <- NULL
+
+      predString <- "
+for(i in 1:subjs) {
+for(s in 1:S){
+theta[s,i] <- phi(mu[s, zeta[i]] + xi[s,zeta[i]]*delta.part.raw[s,i])
+}
+zeta[i] ~ dcat(pi[i,1:H])
+}
+"
+      X_list <- covDataNumeric <- covPars <- NULL
+      predTable <- predFactorLevels <- NULL
+    }
 
 
 

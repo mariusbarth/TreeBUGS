@@ -63,7 +63,15 @@ makeModelFile <-function(model, # either "betaMPT" or "traitMPT"
                                                         predString = predString,
                                                         mu = hyperprior$mu,
                                                         xi = hyperprior$xi,
-                                                        wishart = !anyNA(hyperprior$V))
+                                                        wishart = !anyNA(hyperprior$V)),
+                        "mixtureMPT" = makeMixtureHyperprior(S = S,
+                        predString = predString,
+                        mu = hyperprior$mu,
+                        xi = hyperprior$xi,
+                        H = hyperprior$H,
+                        s_ordered = hyperprior$s_ordered,
+                        alpha = hyperprior$alpha,
+                        wishart = !anyNA(hyperprior$V))
   )
 
   cat("\n\n### Hierarchical structure:",
@@ -210,7 +218,87 @@ makeTraitHyperprior <- function(S, predString, mu = "dnorm(0,1)",
 }
 
 
+################### latent-trait-MPT specific hyperprior part
+makeMixtureHyperprior <- function(S, predString, mu = "dnorm(0,1)",
+                                xi = "dunif(0,100)", H, s_ordered, alpha, wishart = TRUE){
 
+  if(class(mu) != "character" || !length(mu) %in% c(1,S)){
+    stop("Hyperprior for 'mu' must be a character vector of length 1
+     if the same prior should be used for all MPT parameters (default)
+     or a vector of the same length as the number of parameters (=", S, "; to
+     check the order see ?readEQN).")
+  }
+  if(class(xi) != "character" || !length(xi) %in% c(1,S)){
+    stop("Hyperprior for 'xi' must be a character vector of length 1
+     if the same prior should be used for all MPT parameters (default)
+     or a vector of the same length as the number of parameters (=", S, "; to
+     check the order see ?readEQN).")
+  }
+
+  if (wishart){
+
+    modelString <- paste0(predString, "
+
+    # hyperpriors
+    for(i in 1:subjs) {
+      delta.part.raw[1:S,i] ~ dmnorm(zeros,T.prec.part[1:S,1:S, zeta[i]])
+    }
+
+    for (h in 1:H) {    ",
+                          ######################## special case if S=1:
+                          ifelse(S > 1,"
+    T.prec.part[1:S,1:S, h] ~ dwish(V, df)",
+                                 "
+    T.prec.part[1,1, h] ~ dchisq(df)"),
+
+                          "
+    Sigma.raw[1:S,1:S,h] <- inverse(T.prec.part[1:S,1:S,h])
+    for(s in 1:S){
+        mean[s, h] <- phi(mu[s, h])
+      for(q in 1:S){
+        Sigma[s,q,h] <- Sigma.raw[q,s,h]*xi[s,h]*xi[q,h]
+      }
+    }
+
+    for(s in 1:S){
+      for(q in 1:S){
+        # Off-diagonal elements of S (correlations not affected by xi)
+        rho[s,q,h] <- Sigma[s,q,h]/sqrt(Sigma[s,s,h]*Sigma[q,q,h])
+      }
+      # Diagonal elements of S (rescale sigma)
+      sigma[s,h] <- sqrt(Sigma[s,s,h])
+    }}")
+  } else {
+    modelString <- paste0(predString, "
+
+    # hyperpriors
+    for(s in 1:S) {
+      for(i in 1:subjs) {
+        delta.part.raw[s,i] ~ dnorm(0,tau[s])
+      }
+
+      mean[s] <- phi(mu[s])
+      tau[s] ~ dgamma(.5, df / 2)  # = chi-square
+      sigma[s] <- abs(xi[s]) / sqrt(tau[s])
+      for(s2 in 1:S){
+        rho[s,s2] <- -99
+      }
+    }")
+  }
+  paste0(
+    modelString,
+"
+for (i in 1:subjs) {
+  pi[i, 1:H] ~ ddirch(alpha)
+}
+alpha <-", paste0("c(", paste(alpha, collapse = ","), ")"),
+    paste0("\nxi[", rep(1:S, each = H), ", ", rep(1:H, S),"] ~ ", xi, collapse = ""),
+    paste0("\nmu0[", rep(1:S, each = H), ", ", rep(1:H, S),"] ~ ", mu, collapse = ""),
+    paste0("\nmu[", (1:S)[-s_ordered], ",1:H] <- mu0[", (1:S)[-s_ordered],",1:H]", collapse = ""),
+    paste0("\nmu[", s_ordered, ",1:H] <- sort(mu0[",s_ordered,",1:H])", collapse = "")
+    , collapse = "\n"
+  )
+}
 
 
 

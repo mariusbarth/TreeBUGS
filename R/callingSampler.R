@@ -49,6 +49,9 @@ callingSampler <- function(model,
   if(!is.null(fixedPar)){
     parameters <- c(parameters, "thetaFE")
   }
+  if(model == "mixtureMPT"){
+    parameters <- c(parameters, "pi")
+  }
 
   responses <- data
   subjs <- nrow(responses)
@@ -88,10 +91,16 @@ callingSampler <- function(model,
   }
 
 
-  if (model == "traitMPT"){
+  if (model %in% c("traitMPT", "mixtureMPT")){
     df <- hyperpriors$df
     V <- hyperpriors$V
-    data <- c(data, "V", "df")
+    if(model == "mixtureMPT"){
+      H <- hyperpriors$H
+      data <- c(data, "V", "df", "H")
+    }else{
+      data <- c(data, "V", "df")
+    }
+
 
     if (length(X_list) != 0){
       for (pp in 1:length(X_list))
@@ -119,11 +128,16 @@ callingSampler <- function(model,
 
   parametervector=c(unlist(parameters), transformedPar, covPars)
 
-  ############################## starting values
+  # Initial values -------------------------------------------------------------
   inits <- function() {
-    if (model == "betaMPT"){
-      ini <- list("theta"=matrix(runif(subjs*S), S, subjs))
-    } else {
+
+    # Beta-MPT case ----
+    if(model == "betaMPT") {
+      ini <- list(theta = matrix(runif(subjs * S), S, subjs))
+    }
+
+    # Latent-trait case ----
+    if(model == "traitMPT") {
       # draw appropriate random starting values:
       mu <- xi <- rep(NA, S)
       for(s in 1:S){
@@ -143,11 +157,43 @@ callingSampler <- function(model,
       # starts with small correlations and scaling parameters close to 1
       if (!anyNA(hyperpriors$V))
         ini$T.prec.part <- as.matrix(rWishart(1,df+30,V)[,,1])
-
-      # check starting values:
-      # hist(replicate(1000,cov2cor(solve(rWishart(1,4+1+30,diag(2))[,,1]))[1,2]))
-      # hist(replicate(5000,runif(1,.2,1)*sqrt(solve(rWishart(1,4+1+30,diag(2))[,,1])[1,1])))
     }
+
+    # Latent-mixture case ----
+    if(model == "mixtureMPT") {
+      H <- hyperpriors$H
+
+      mu <- matrix(rep(hyperpriors$mu, length.out = S * H), nrow = S, ncol = H)
+      mu <- apply(X = mu, MARGIN = 1:2, FUN = function(x){
+        eval(parse(text=sub("d","r", sub("(","(1,", x,  fixed = TRUE))))
+      })
+
+      xi <- matrix(rep(hyperpriors$xi, length.out = S * H), nrow = S, ncol = H)
+
+      if(xi[1, 1] == "dunif(0,10") {
+        xi <- apply(X = xi, MARGIN = 1:2, FUN = runif, n = 1, min = .2, max = 1)
+        # less extreme starting values (as above)
+      } else {
+        xi <- apply(X = xi, MARGIN = 1:2, FUN = function(x){
+          eval(parse(text=sub("d","r", sub("(","(1,", x,  fixed = TRUE))))
+        })
+      }
+
+      ini <- list(
+        delta.part.raw = matrix(rnorm(subjs * S, 0, 1), S, subjs)
+        , mu0 = mu
+        , xi = xi
+      )
+
+      # starts with small correlations and scaling parameters close to 1
+      if (!anyNA(hyperpriors$V))
+        ini$T.prec.part <- rWishart(n = H, df + 30, V)
+
+    }
+
+    # check starting values:
+    # hist(replicate(1000,cov2cor(solve(rWishart(1,4+1+30,diag(2))[,,1]))[1,2]))
+    # hist(replicate(5000,runif(1,.2,1)*sqrt(solve(rWishart(1,4+1+30,diag(2))[,,1])[1,1])))
     ini
   }
   inits.list <- replicate(n.chains, inits(), simplify=FALSE)
@@ -156,7 +202,7 @@ callingSampler <- function(model,
                                    "base::Marsaglia-Multicarry",
                                    "base::Super-Duper",
                                    "base::Mersenne-Twister")[1+ (i-1)%% 4]
-    inits.list[[i]]$.RNG.seed <-  sample.int(1e4, 1)
+    inits.list[[i]]$.RNG.seed <-  sample.int(n = .Machine$integer.max, size = 1)
   }
 
   n.samples <- ceiling((n.iter-n.burnin)/n.thin)

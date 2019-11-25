@@ -56,20 +56,45 @@ summarizeMPT <- function(mcmc, mptInfo, probs = c(.025,.50,.975), summ = NULL){
     }
   }else{thetaFE <- NULL}
 
-  rho <- rhoNames <- c()
-  cnt <- 1
-  while(cnt < S){
-    rho <- rbind(rho, summ[paste0("rho[",cnt,",",(cnt+1):S,"]"),, drop=FALSE])
-    rhoNames <- c(rhoNames,
-                  paste0("rho[",uniqueNames[cnt],",",uniqueNames[(cnt+1):S],"]"))
-    cnt <- cnt+1
-  }
-  if(S == 1) rho <- matrix(1,1,1, dimnames=list(uniqueNames,uniqueNames))
-  rownames(rho) <- rhoNames
-  rho.matrix <- getRhoMatrix(uniqueNames, rho)
+  if(model != "mixtureMPT") {
+    # standard dimensions
+    rho <- rhoNames <- c()
+    cnt <- 1
+    while(cnt < S){
+      rho <- rbind(rho, summ[paste0("rho[",cnt,",",(cnt+1):S,"]"),, drop=FALSE])
+      rhoNames <- c(rhoNames,
+                    paste0("rho[",uniqueNames[cnt],",",uniqueNames[(cnt+1):S],"]"))
+      cnt <- cnt+1
+    }
+    if(S == 1) rho <- matrix(1,1,1, dimnames=list(uniqueNames,uniqueNames))
+    rownames(rho) <- rhoNames
+    rho.matrix <- getRhoMatrix(uniqueNames, rho)
 
-  mean <- summ[paste0("mean", idx),, drop=FALSE]
-  rownames(mean) <-paste0("mean_", uniqueNames)
+    mean <- summ[paste0("mean", idx),, drop=FALSE]
+    rownames(mean) <-paste0("mean_", uniqueNames)
+  } else {
+    H <- sum(grepl(rownames(summ), pattern = "mean"))/length(uniqueNames)
+    # print(rownames(summ)[grepl(rownames(summ), pattern = "mean")])
+
+    # one extra dimension
+    # rho <- rhoNames <- c()
+    # cnt <- 1
+    # while(cnt < S){
+    #   rho <- rbind(rho, summ[paste0("rho[",cnt,",",(cnt+1):S,"]"),, drop=FALSE])
+    #   rhoNames <- c(rhoNames,
+    #                 paste0("rho[",uniqueNames[cnt],",",uniqueNames[(cnt+1):S],"]"))
+    #   cnt <- cnt+1
+    # }
+    # if(S == 1) rho <- matrix(1,1,1, dimnames=list(uniqueNames,uniqueNames))
+    # rownames(rho) <- rhoNames
+    # rho.matrix <- getRhoMatrix(uniqueNames, rho)
+
+
+
+    mean <- summ[paste0("mean[", rep(seq_along(uniqueNames), H), ",", rep(1:H, each = length(uniqueNames)), "]"), , drop = FALSE]
+    rownames(mean) <- paste0("mean_", rep(uniqueNames, H), "_", rep(1:H, each = length(uniqueNames)))
+    groupParameters <- list(mean = mean)
+  }
   ############################## BETA MPT SUMMARY
   if(model == "simpleMPT"){
     SD <- summ[paste0("sd",idx),, drop=FALSE]
