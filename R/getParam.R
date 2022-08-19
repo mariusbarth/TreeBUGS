@@ -43,7 +43,7 @@
 #' @export
 getParam <- function(fittedModel, parameter="mean", stat="mean", file = NULL){
 
-  if(! class(fittedModel) %in% c("betaMPT", "traitMPT"))
+  if(! class(fittedModel) %in% c("betaMPT", "traitMPT", "mixtureMPT"))
     stop("Only for hierarchical MPT models (see ?traitMPT & ?betaMPT).")
 
   thetaUnique <- fittedModel$mptInfo$thetaUnique

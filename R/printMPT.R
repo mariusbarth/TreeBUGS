@@ -117,6 +117,9 @@ summary.traitMPT <- function(object, round=3, ...){
 }
 
 #' @export
+summary.mixtureMPT <- summary.traitMPT
+
+#' @export
 summary.simpleMPT <- function(object, round=3, ...){
   summ <- object$summary
   summ$call <- object$call
@@ -146,6 +149,9 @@ print.traitMPT <- function(x,  ...){
 
   cat("\nUse 'summary(fittedModel)' or 'plot(fittedModel)' to get a more detailed summary.")
 }
+
+#' @export
+print.mixtureMPT <- print.traitMPT
 
 #' @export
 print.simpleMPT <- function(x,  ...){

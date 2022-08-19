@@ -51,8 +51,10 @@ mixtureMPT <- function(
     df = df, IVprec = IVprec,
     H = H, orderedParameter = orderedParameter, alpha = alpha)
 
-  fitModel(type="mixtureMPT", eqnfile=eqnfile,
-           data=data,restrictions=restrictions,
+  fitModel(type="mixtureMPT",
+           eqnfile=eqnfile,
+           data=data,
+           restrictions=restrictions,
            covData=covData,
            predStructure=predStructure,
            predType=predType,    # c("c," f", "r")

@@ -57,7 +57,7 @@ summarizeMCMC <- function(mcmc, batchSize = 50, probs = c(.025, .50, .975)){
   }
 
   if (all(is.na(summTab))){
-    cat("summarizeMCMC: posterior summary in baches failed. trying coda::summary instead.\n")
+    cat("summarizeMCMC: posterior summary in batches failed. trying coda::summary instead.\n")
     try({
       summ <- summary(mcmc)
       summTab <- cbind(summ[[1]][,c("Mean", "SD")],
